@@ -1,0 +1,4 @@
+{"nome":"Manga","variedades":"Palmer, Tommy Atkins, Kent","temperatura_min":24,"temperatura_max":30,"umidade_min":50,"umidade_max":70,"ciclo_medio_dias":120,"descricao":"Perene. Principal fruta de exportação da propriedade."}
+{"nome":"Uva","variedades":"Vitória, Thompson, Crimson","temperatura_min":20,"temperatura_max":30,"umidade_min":45,"umidade_max":65,"ciclo_medio_dias":120,"descricao":"Duas safras por ano com poda programada."}
+{"nome":"Goiaba","variedades":"Paluma","temperatura_min":23,"temperatura_max":30,"umidade_min":60,"umidade_max":80,"ciclo_medio_dias":180,"descricao":"Mercado interno e indústria de polpa."}
+{"nome":"Melão","variedades":"Amarelo, Gália, Pele de Sapo","temperatura_min":25,"temperatura_max":32,"umidade_min":50,"umidade_max":70,"ciclo_medio_dias":70,"descricao":"Ciclo curto, exportação para Reino Unido e UE."}

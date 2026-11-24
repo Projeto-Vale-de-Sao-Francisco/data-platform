@@ -1,0 +1,183 @@
+{
+ "name": "campo_vivo_pipeline_medalhao",
+ "description": "Bronze → Silver → Gold → ML (Campo Vivo). Código em /Volumes/campo_vivo/bronze/code.",
+ "max_concurrent_runs": 1,
+ "tags": {
+  "projeto": "campo_vivo"
+ },
+ "schedule": {
+  "quartz_cron_expression": "0 37 5 * * ?",
+  "timezone_id": "America/Sao_Paulo",
+  "pause_status": "PAUSED"
+ },
+ "environments": [
+  {
+   "environment_key": "default",
+   "spec": {
+    "client": "3",
+    "dependencies": [
+     "scikit-learn",
+     "mlflow"
+    ]
+   }
+  }
+ ],
+ "tasks": [
+  {
+   "task_key": "b01_cadastros",
+   "spark_python_task": {
+    "python_file": "dbfs:/Volumes/campo_vivo/bronze/code/bronze/b01_cadastros.py"
+   },
+   "environment_key": "default",
+   "depends_on": [],
+   "max_retries": 1,
+   "min_retry_interval_millis": 60000
+  },
+  {
+   "task_key": "b02_clima_openmeteo",
+   "spark_python_task": {
+    "python_file": "dbfs:/Volumes/campo_vivo/bronze/code/bronze/b02_clima_openmeteo.py"
+   },
+   "environment_key": "default",
+   "depends_on": [
+    {
+     "task_key": "b01_cadastros"
+    }
+   ],
+   "max_retries": 1,
+   "min_retry_interval_millis": 60000
+  },
+  {
+   "task_key": "b03_simulador_iot",
+   "spark_python_task": {
+    "python_file": "dbfs:/Volumes/campo_vivo/bronze/code/bronze/b03_simulador_iot.py"
+   },
+   "environment_key": "default",
+   "depends_on": [
+    {
+     "task_key": "b02_clima_openmeteo"
+    }
+   ],
+   "max_retries": 1,
+   "min_retry_interval_millis": 60000
+  },
+  {
+   "task_key": "b04_safras_vigor",
+   "spark_python_task": {
+    "python_file": "dbfs:/Volumes/campo_vivo/bronze/code/bronze/b04_safras_vigor.py"
+   },
+   "environment_key": "default",
+   "depends_on": [
+    {
+     "task_key": "b02_clima_openmeteo"
+    }
+   ],
+   "max_retries": 1,
+   "min_retry_interval_millis": 60000
+  },
+  {
+   "task_key": "b05_iot_externo",
+   "spark_python_task": {
+    "python_file": "dbfs:/Volumes/campo_vivo/bronze/code/bronze/b05_iot_externo.py"
+   },
+   "environment_key": "default",
+   "depends_on": [
+    {
+     "task_key": "b01_cadastros"
+    }
+   ],
+   "max_retries": 1,
+   "min_retry_interval_millis": 60000
+  },
+  {
+   "task_key": "s01_referencias",
+   "spark_python_task": {
+    "python_file": "dbfs:/Volumes/campo_vivo/bronze/code/silver/s01_referencias.py"
+   },
+   "environment_key": "default",
+   "depends_on": [
+    {
+     "task_key": "b03_simulador_iot"
+    },
+    {
+     "task_key": "b04_safras_vigor"
+    },
+    {
+     "task_key": "b05_iot_externo"
+    }
+   ],
+   "max_retries": 1,
+   "min_retry_interval_millis": 60000
+  },
+  {
+   "task_key": "s02_leituras_iot",
+   "spark_python_task": {
+    "python_file": "dbfs:/Volumes/campo_vivo/bronze/code/silver/s02_leituras_iot.py"
+   },
+   "environment_key": "default",
+   "depends_on": [
+    {
+     "task_key": "s01_referencias"
+    }
+   ],
+   "max_retries": 1,
+   "min_retry_interval_millis": 60000
+  },
+  {
+   "task_key": "g01_clima_diario",
+   "spark_python_task": {
+    "python_file": "dbfs:/Volumes/campo_vivo/bronze/code/gold/g01_clima_diario.py"
+   },
+   "environment_key": "default",
+   "depends_on": [
+    {
+     "task_key": "s02_leituras_iot"
+    }
+   ],
+   "max_retries": 1,
+   "min_retry_interval_millis": 60000
+  },
+  {
+   "task_key": "g02_features_ml",
+   "spark_python_task": {
+    "python_file": "dbfs:/Volumes/campo_vivo/bronze/code/gold/g02_features_ml.py"
+   },
+   "environment_key": "default",
+   "depends_on": [
+    {
+     "task_key": "g01_clima_diario"
+    }
+   ],
+   "max_retries": 1,
+   "min_retry_interval_millis": 60000
+  },
+  {
+   "task_key": "m01_treino_predicao",
+   "spark_python_task": {
+    "python_file": "dbfs:/Volumes/campo_vivo/bronze/code/ml/m01_treino_predicao.py"
+   },
+   "environment_key": "default",
+   "depends_on": [
+    {
+     "task_key": "g02_features_ml"
+    }
+   ],
+   "max_retries": 1,
+   "min_retry_interval_millis": 60000
+  },
+  {
+   "task_key": "m02_risco_climatico",
+   "spark_python_task": {
+    "python_file": "dbfs:/Volumes/campo_vivo/bronze/code/ml/m02_risco_climatico.py"
+   },
+   "environment_key": "default",
+   "depends_on": [
+    {
+     "task_key": "m01_treino_predicao"
+    }
+   ],
+   "max_retries": 1,
+   "min_retry_interval_millis": 60000
+  }
+ ]
+}

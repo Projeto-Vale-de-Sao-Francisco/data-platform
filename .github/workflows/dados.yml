@@ -1,0 +1,60 @@
+name: Pipeline de dados (Databricks)
+
+# entrada: a cada 3 h envia leituras reais (backend + ThingSpeak) para o Volume de landing
+# diario: roda o pipeline medalhão no Databricks e publica as predições no Postgres (schema analytics)
+on:
+  schedule:
+    - cron: "17 */3 * * *"      # entrada
+    - cron: "41 8 * * *"        # diário (05:41 BRT)
+  workflow_dispatch:
+    inputs:
+      etapa:
+        description: "entrada | diario"
+        required: true
+        default: diario
+
+concurrency:
+  group: dados-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  DATABRICKS_HOST: ${{ secrets.DATABRICKS_HOST }}
+  DATABRICKS_TOKEN: ${{ secrets.DATABRICKS_TOKEN }}
+  DATABRICKS_WAREHOUSE_ID: ${{ vars.DATABRICKS_WAREHOUSE_ID }}
+  DATABRICKS_JOB_ID: ${{ vars.DATABRICKS_JOB_ID }}
+
+jobs:
+  entrada:
+    if: github.event.schedule == '17 */3 * * *' || inputs.etapa == 'entrada'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - name: Leituras reais → landing
+        env:
+          BACKEND_URL: ${{ vars.BACKEND_URL }}
+          DEVICE_API_KEY: ${{ secrets.DEVICE_API_KEY }}
+          THINGSPEAK_CHANNEL_ID: ${{ vars.THINGSPEAK_CHANNEL_ID }}
+          THINGSPEAK_READ_API_KEY: ${{ secrets.THINGSPEAK_READ_API_KEY }}
+        run: python extrator/extrator.py entrada
+
+  diario:
+    if: github.event.schedule == '41 8 * * *' || inputs.etapa == 'diario'
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - name: Publicar código no Volume do Databricks
+        run: bash scripts/publicar_codigo.sh
+      - name: Rodar pipeline medalhão
+        run: python extrator/extrator.py pipeline
+      - name: Publicar predições no Postgres
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          pip install "psycopg[binary]"
+          python extrator/extrator.py saida
