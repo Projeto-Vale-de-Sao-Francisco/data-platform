@@ -68,11 +68,19 @@ def medicao_backend_para_payload(m: dict) -> dict:
     }.items() if v is not None}
 
 
+CAMPOS_THINGSPEAK = {"field1": "temperatura", "field2": "umidade", "field3": "umidade_solo",
+                     "field4": "luminosidade", "field5": "precipitacao"}
+
+
 def feed_thingspeak_para_payload(f: dict, device: str) -> dict:
-    """Feed do ThingSpeak (field1 = temperatura, field2 = umidade) → payload IoT padrão."""
-    num = lambda x: float(x) if x not in (None, "") else None  # noqa: E731
-    return {k: v for k, v in {"device": device, "ts": f.get("created_at"),
-                              "temperatura": num(f.get("field1")), "umidade": num(f.get("field2"))}.items() if v is not None}
+    """Feed do ThingSpeak → payload IoT padrão (mapeamento em CAMPOS_THINGSPEAK; campos vazios são omitidos)."""
+    def num(x):
+        try:
+            return float(x) if x not in (None, "") else None
+        except ValueError:
+            return None
+    p = {"device": device, "ts": f.get("created_at"), **{nome: num(f.get(campo)) for campo, nome in CAMPOS_THINGSPEAK.items()}}
+    return {k: v for k, v in p.items() if v is not None}
 
 
 # ---------------------------------------------------------------- comandos
@@ -105,7 +113,7 @@ def _thingspeak():
     chave = (os.environ.get("THINGSPEAK_READ_API_KEY") or "").strip()
     q = urllib.parse.urlencode({"results": 8000, **({"api_key": chave} if chave else {})})
     feeds = http("GET", f"https://api.thingspeak.com/channels/{canal}/feeds.json?{q}").get("feeds", [])
-    dev = os.environ.get("THINGSPEAK_DEVICE", "ESP32-TALHAO-01")
+    dev = (os.environ.get("THINGSPEAK_DEVICE") or "ESP32-TALHAO-01").strip()
     return [{"payload": json.dumps(feed_thingspeak_para_payload(f, dev)), "gateway": "thingspeak"} for f in feeds]
 
 

@@ -38,3 +38,15 @@ def test_fonte_com_erro_http_nao_derruba_as_outras(monkeypatch):
     assert r == [] and erro == "thingspeak: HTTP 400"
     r, erro = ex._fonte("backend", lambda: [{"payload": "{}"}])
     assert len(r) == 1 and erro is None
+
+
+def test_feed_thingspeak_le_os_cinco_campos():
+    f = {"created_at": "2026-11-24T21:00:00Z", "field1": "30.1", "field2": "48", "field3": "41.5", "field4": "52000",
+         "field5": "0", "field6": "ignorado"}
+    assert ex.feed_thingspeak_para_payload(f, "SN-101") == {
+        "device": "SN-101", "ts": "2026-11-24T21:00:00Z", "temperatura": 30.1, "umidade": 48.0, "umidade_solo": 41.5,
+        "luminosidade": 52000.0, "precipitacao": 0.0}
+
+
+def test_feed_thingspeak_valor_nao_numerico_vira_ausente():
+    assert "temperatura" not in ex.feed_thingspeak_para_payload({"created_at": "x", "field1": "nan?"}, "SN-101")

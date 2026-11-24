@@ -29,8 +29,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
         with: { python-version: "3.12" }
       - name: Leituras reais → landing
         env:
@@ -38,6 +38,7 @@ jobs:
           DEVICE_API_KEY: ${{ secrets.DEVICE_API_KEY }}
           THINGSPEAK_CHANNEL_ID: ${{ vars.THINGSPEAK_CHANNEL_ID }}
           THINGSPEAK_READ_API_KEY: ${{ secrets.THINGSPEAK_READ_API_KEY }}
+          THINGSPEAK_DEVICE: ${{ vars.THINGSPEAK_DEVICE }}
         run: python extrator/extrator.py entrada
 
   diario:
@@ -45,8 +46,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
         with: { python-version: "3.12" }
       - name: Publicar código no Volume do Databricks
         run: bash scripts/publicar_codigo.sh
