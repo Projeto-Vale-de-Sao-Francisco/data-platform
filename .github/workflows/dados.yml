@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
     inputs:
       etapa:
-        description: "entrada | diario"
+        description: "entrada | diario | saida"
         required: true
         default: diario
 
@@ -42,7 +42,7 @@ jobs:
         run: python extrator/extrator.py entrada
 
   diario:
-    if: github.event.schedule == '41 8 * * *' || inputs.etapa == 'diario'
+    if: github.event.schedule == '41 8 * * *' || inputs.etapa == 'diario' || inputs.etapa == 'saida'
     runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:
@@ -50,8 +50,10 @@ jobs:
       - uses: actions/setup-python@v6
         with: { python-version: "3.12" }
       - name: Publicar código no Volume do Databricks
+        if: inputs.etapa != 'saida'
         run: bash scripts/publicar_codigo.sh
       - name: Rodar pipeline medalhão
+        if: inputs.etapa != 'saida'
         run: python extrator/extrator.py pipeline
       - name: Publicar predições no Postgres
         env:

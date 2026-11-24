@@ -52,8 +52,11 @@ def http(metodo: str, url: str, corpo=None, headers=None, bruto: bytes | None = 
 
 
 def dbx(metodo: str, caminho: str, corpo=None, bruto=None):
-    h = {"Authorization": f"Bearer {env('DATABRICKS_TOKEN')}", "Content-Type": "application/json"}
-    return http(metodo, env("DATABRICKS_HOST").rstrip("/") + caminho, corpo, h, bruto)
+    h = {"Authorization": f"Bearer {env('DATABRICKS_TOKEN').strip()}", "Content-Type": "application/json"}
+    try:
+        return http(metodo, env("DATABRICKS_HOST").strip().rstrip("/") + caminho, corpo, h, bruto)
+    except urllib.error.HTTPError as e:  # mostra a mensagem do Databricks (ex.: escopo do token insuficiente)
+        sys.exit(f"Databricks {metodo} {caminho.split('?')[0]} → HTTP {e.code}: {e.read().decode(errors='replace')[:400]}")
 
 
 # ---------------------------------------------------------------- transformação (testada em tests/)
