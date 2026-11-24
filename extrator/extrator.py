@@ -19,6 +19,7 @@ import json
 import os
 import sys
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 
@@ -75,29 +76,60 @@ def feed_thingspeak_para_payload(f: dict, device: str) -> dict:
 
 
 # ---------------------------------------------------------------- comandos
+def _fonte(nome, fn):
+    """Executa uma fonte de leituras; uma fonte com erro não impede as outras."""
+    try:
+        r = fn()
+        print(f"[{nome}] {len(r)} mensagens")
+        return r, None
+    except urllib.error.HTTPError as e:
+        detalhe = e.read().decode(errors="replace")[:300]
+        print(f"::warning::[{nome}] HTTP {e.code}: {detalhe or e.reason}")
+        return [], f"{nome}: HTTP {e.code}"
+    except Exception as e:  # noqa: BLE001
+        print(f"::warning::[{nome}] {type(e).__name__}: {e}")
+        return [], f"{nome}: {type(e).__name__}"
+
+
+def _backend(agora):
+    backend = env("BACKEND_URL")
+    inicio = (agora - dt.timedelta(days=2)).isoformat()
+    q = urllib.parse.urlencode({"dataInicio": inicio, "limit": 1000})
+    h = {"x-api-key": os.environ["DEVICE_API_KEY"].strip()} if os.environ.get("DEVICE_API_KEY") else {}
+    return [{"payload": json.dumps(medicao_backend_para_payload(m)), "gateway": "backend-render"}
+            for m in http("GET", f"{backend.rstrip('/')}/readings?{q}", headers=h, timeout=180)]
+
+
+def _thingspeak():
+    canal = env("THINGSPEAK_CHANNEL_ID").strip()
+    chave = (os.environ.get("THINGSPEAK_READ_API_KEY") or "").strip()
+    q = urllib.parse.urlencode({"results": 8000, **({"api_key": chave} if chave else {})})
+    feeds = http("GET", f"https://api.thingspeak.com/channels/{canal}/feeds.json?{q}").get("feeds", [])
+    dev = os.environ.get("THINGSPEAK_DEVICE", "ESP32-TALHAO-01")
+    return [{"payload": json.dumps(feed_thingspeak_para_payload(f, dev)), "gateway": "thingspeak"} for f in feeds]
+
+
 def entrada():
     agora = dt.datetime.now(dt.timezone.utc)
-    linhas = []
-    backend = env("BACKEND_URL", False)
-    if backend:
-        inicio = (agora - dt.timedelta(days=2)).isoformat()
-        q = urllib.parse.urlencode({"dataInicio": inicio, "limit": 1000})
-        h = {"x-api-key": os.environ["DEVICE_API_KEY"]} if os.environ.get("DEVICE_API_KEY") else {}
-        for m in http("GET", f"{backend.rstrip('/')}/readings?{q}", headers=h, timeout=180):
-            linhas.append({"payload": json.dumps(medicao_backend_para_payload(m)), "gateway": "backend-render"})
-    canal = env("THINGSPEAK_CHANNEL_ID", False)
-    if canal:
-        q = urllib.parse.urlencode({"results": 8000, **({"api_key": os.environ["THINGSPEAK_READ_API_KEY"]}
-                                                        if os.environ.get("THINGSPEAK_READ_API_KEY") else {})})
-        feeds = http("GET", f"https://api.thingspeak.com/channels/{canal}/feeds.json?{q}").get("feeds", [])
-        dev = os.environ.get("THINGSPEAK_DEVICE", "ESP32-TALHAO-01")
-        linhas += [{"payload": json.dumps(feed_thingspeak_para_payload(f, dev)), "gateway": "thingspeak"} for f in feeds]
+    linhas, falhas = [], []
+    fontes = []
+    if os.environ.get("BACKEND_URL"):
+        fontes.append(("backend", lambda: _backend(agora)))
+    if os.environ.get("THINGSPEAK_CHANNEL_ID"):
+        fontes.append(("thingspeak", _thingspeak))
+    for nome, fn in fontes:
+        r, erro = _fonte(nome, fn)
+        linhas += r
+        if erro:
+            falhas.append(erro)
     recebido = agora.isoformat()
     corpo = "\n".join(json.dumps({**l, "received_at": recebido}) for l in linhas).encode()
     nome = f"{LANDING}/{agora:%Y%m%dT%H%M%S}.jsonl"
     if linhas:
         dbx("PUT", f"/api/2.0/fs/files{nome}?overwrite=true", bruto=corpo)
     print(f"{len(linhas)} mensagens enviadas para {nome if linhas else '(nada a enviar)'}")
+    if fontes and len(falhas) == len(fontes):
+        sys.exit("todas as fontes falharam: " + "; ".join(falhas))
 
 
 def pipeline():

@@ -25,3 +25,16 @@ def test_feed_thingspeak_converte_texto_e_ignora_vazios():
 
 def test_tipos_postgres_conhecidos():
     assert ex.TIPOS_PG["DOUBLE"] == "double precision" and ex.TIPOS_PG["DATE"] == "date"
+
+
+def test_fonte_com_erro_http_nao_derruba_as_outras(monkeypatch):
+    import io
+    import urllib.error
+
+    def falha():
+        raise urllib.error.HTTPError("u", 400, "Bad Request", {}, io.BytesIO(b"-1"))
+
+    r, erro = ex._fonte("thingspeak", falha)
+    assert r == [] and erro == "thingspeak: HTTP 400"
+    r, erro = ex._fonte("backend", lambda: [{"payload": "{}"}])
+    assert len(r) == 1 and erro is None
