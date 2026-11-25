@@ -1,17 +1,23 @@
 name: Pipeline de dados (Databricks)
 
-# entrada: a cada 3 h envia leituras reais (backend + ThingSpeak) para o Volume de landing
-# diario: roda o pipeline medalhão no Databricks e publica as predições no Postgres (schema analytics)
+# O pipeline medalhão é agendado NO DATABRICKS (job campo_vivo_pipeline_medalhao, 05:37 BRT), que é confiável.
+# Este workflow faz a ponte com o que o Databricks Free Edition não alcança:
+#   agendado (a cada 3 h): leituras reais → landing  +  previsões mais recentes → Postgres (analytics)
+#     → se o GitHub pular uma execução agendada, a próxima recupera.
+#   push no main (src/ ou seeds/): publica o código no Volume do Databricks.
+#   manual: entrada | saida | pipeline (roda o job agora e publica).
 on:
   schedule:
-    - cron: "17 */3 * * *"      # entrada
-    - cron: "41 8 * * *"        # diário (05:41 BRT)
+    - cron: "17 */3 * * *"
+  push:
+    branches: [main]
+    paths: ["src/**", "seeds/**", "scripts/publicar_codigo.sh"]
   workflow_dispatch:
     inputs:
       etapa:
-        description: "entrada | diario | saida"
+        description: "entrada | saida | pipeline"
         required: true
-        default: diario
+        default: saida
 
 concurrency:
   group: dados-${{ github.ref }}
@@ -24,15 +30,25 @@ env:
   DATABRICKS_JOB_ID: ${{ vars.DATABRICKS_JOB_ID }}
 
 jobs:
-  entrada:
-    if: github.event.schedule == '17 */3 * * *' || inputs.etapa == 'entrada'
+  publicar-codigo:
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - name: Publicar código no Volume do Databricks
+        run: bash scripts/publicar_codigo.sh
+
+  ponte:
+    if: github.event_name != 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-python@v6
         with: { python-version: "3.12" }
       - name: Leituras reais → landing
+        if: github.event_name == 'schedule' || inputs.etapa == 'entrada'
         env:
           BACKEND_URL: ${{ vars.BACKEND_URL }}
           DEVICE_API_KEY: ${{ secrets.DEVICE_API_KEY }}
@@ -40,22 +56,13 @@ jobs:
           THINGSPEAK_READ_API_KEY: ${{ secrets.THINGSPEAK_READ_API_KEY }}
           THINGSPEAK_DEVICE: ${{ vars.THINGSPEAK_DEVICE }}
         run: python extrator/extrator.py entrada
-
-  diario:
-    if: github.event.schedule == '41 8 * * *' || inputs.etapa == 'diario' || inputs.etapa == 'saida'
-    runs-on: ubuntu-latest
-    timeout-minutes: 120
-    steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-python@v6
-        with: { python-version: "3.12" }
-      - name: Publicar código no Volume do Databricks
-        if: inputs.etapa != 'saida'
-        run: bash scripts/publicar_codigo.sh
-      - name: Rodar pipeline medalhão
-        if: inputs.etapa != 'saida'
-        run: python extrator/extrator.py pipeline
-      - name: Publicar predições no Postgres
+      - name: Publicar código e rodar o pipeline agora
+        if: inputs.etapa == 'pipeline'
+        run: |
+          bash scripts/publicar_codigo.sh
+          python extrator/extrator.py pipeline
+      - name: Previsões mais recentes → Postgres
+        if: github.event_name == 'schedule' || inputs.etapa == 'saida' || inputs.etapa == 'pipeline'
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: |

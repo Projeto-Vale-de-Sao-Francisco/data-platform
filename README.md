@@ -80,5 +80,7 @@ o pipeline usa a média e registra isso em `gold.modelo_metadados.estrategia`. T
 | `DEVICE_API_KEY`, `THINGSPEAK_READ_API_KEY` | secret | opcionais |
 | `DATABRICKS_WAREHOUSE_ID`, `DATABRICKS_JOB_ID`, `BACKEND_URL`, `THINGSPEAK_CHANNEL_ID` | variable | `0e8d14e2365f32b0`, `335240795921917`, `https://chico-talhao-backend.onrender.com`, `3502672` |
 
-Cota da Free Edition: o job completo leva ~25 min de compute serverless; a agenda do próprio job fica **pausada** e quem
-dispara é o workflow `diario`.
+Agendamento: o **job do Databricks roda sozinho às 05:37 BRT** (o agendamento do GitHub Actions pode atrasar ou pular
+execuções). O workflow `dados` roda a cada 3 h: envia as leituras reais e publica no Postgres as previsões mais recentes,
+então uma execução pulada é recuperada na seguinte. Um push em `src/` ou `seeds/` publica o código no Volume.
+Cota da Free Edition: o job completo usa ~12 min de compute serverless por dia.
