@@ -48,6 +48,7 @@ src/eda/eda_climatica.py    notebook de análise exploratória (item 4)
 extrator/extrator.py        entrada (landing) · pipeline (run-now) · saida (Postgres)
 jobs/…json                  definição do job no Databricks
 docs/CONTRATO_PREDICOES.md  contrato das tabelas analytics e dos endpoints /predicoes
+docs/DICIONARIO_DE_DADOS.md todas as tabelas e colunas (gerado por scripts/gerar_dicionario.py)
 seeds/                      cadastros (fazendas, talhões, sensores, culturas…)
 ```
 
