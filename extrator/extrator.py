@@ -8,7 +8,10 @@ O Databricks Free Edition não alcança o Render nem o ThingSpeak, então a inte
   saida    → lê as tabelas Gold de predição (SQL Statement API) e grava no Postgres do Render,
              no schema `analytics` (separado das tabelas do Prisma).
 
-Uso:  python extrator.py entrada | pipeline | saida
+  mercado  → baixa ComexStat (preço médio de exportação por país e mês) e PTAX diária do Banco Central
+             e envia as respostas brutas para /Volumes/campo_vivo/bronze/landing/mercado/.
+
+Uso:  python extrator.py entrada | mercado | pipeline | saida
 Variáveis: DATABRICKS_HOST, DATABRICKS_TOKEN, DATABRICKS_WAREHOUSE_ID, DATABRICKS_JOB_ID, BACKEND_URL,
            DEVICE_API_KEY (opcional), THINGSPEAK_CHANNEL_ID, THINGSPEAK_READ_API_KEY, THINGSPEAK_DEVICE, DATABASE_URL
 """
@@ -33,6 +36,10 @@ TABELAS_SAIDA = {  # tabela Gold → (tabela no Postgres, colunas-chave)
     "risco_climatico_talhao": "risco_climatico_talhao",
     "risco_climatico_fazenda": "risco_climatico_fazenda",
     "indicadores_talhao": "indicadores_talhao",
+    "mercado_serie": "mercado_serie",
+    "mercado_referencias": "mercado_referencias",
+    "mercado_previsao": "mercado_previsao",
+    "mercado_modelo_metadados": "mercado_modelo_metadados",
 }
 
 
@@ -143,6 +150,59 @@ def entrada():
         sys.exit("todas as fontes falharam: " + "; ".join(falhas))
 
 
+LANDING_MERCADO = "/Volumes/campo_vivo/bronze/landing/mercado"
+NCM_CULTURAS = {"Manga": ["08045020"], "Uva": ["08061000"], "Melão": ["08071900"], "Goiaba": ["08045010"]}
+ESTADOS_COMEX = [26, 29, 24]  # PE, BA, RN (código IBGE da UF, como a ComexStat usa)
+INICIO_MERCADO = dt.date(2019, 1, 1)
+
+
+def _comexstat(hoje: dt.date) -> bytes:
+    fim = (hoje.replace(day=1) - dt.timedelta(days=1)).strftime("%Y-%m")
+    respostas = {}
+    for cultura, ncm in NCM_CULTURAS.items():
+        corpo = {"flow": "export", "monthDetail": True,
+                 "period": {"from": INICIO_MERCADO.strftime("%Y-%m"), "to": fim},
+                 "filters": [{"filter": "ncm", "values": ncm}, {"filter": "state", "values": ESTADOS_COMEX}],
+                 "details": ["country"], "metrics": ["metricFOB", "metricKG"]}
+        r = http("POST", "https://api-comexstat.mdic.gov.br/general?language=pt", corpo,
+                 {"Content-Type": "application/json", "Accept": "application/json"}, timeout=180)
+        if not (isinstance(r, dict) and r.get("success") is True):
+            raise RuntimeError(f"ComexStat sem sucesso para {cultura}")
+        respostas[cultura] = {"ncm": ncm, "estados": ESTADOS_COMEX, "periodo": corpo["period"], "resposta": r}
+        print(f"[comexstat] {cultura}: {len(r.get('data', {}).get('list', []))} linhas")
+        time.sleep(2)  # a API pública limita requisições seguidas
+    return json.dumps(respostas, ensure_ascii=False).encode()
+
+
+def _ptax(hoje: dt.date) -> bytes:
+    fmt = lambda d: d.strftime("%m-%d-%Y")  # noqa: E731 — OData PTAX usa MM-DD-YYYY
+    q = urllib.parse.urlencode({"@dataInicial": f"'{fmt(INICIO_MERCADO)}'", "@dataFinalCotacao": f"'{fmt(hoje)}'",
+                                "$format": "json", "$top": "10000"})
+    r = http("GET", "https://olinda.bcb.gov.br/olinda/servico/PTAX/versao/v1/odata/"
+                    f"CotacaoDolarPeriodo(dataInicial=@dataInicial,dataFinalCotacao=@dataFinalCotacao)?{q}",
+             headers={"Accept": "application/json"}, timeout=180)
+    print(f"[ptax] {len(r.get('value', []))} cotações")
+    return json.dumps(r).encode()
+
+
+def mercado():
+    hoje = dt.date.today()
+    carimbo = dt.datetime.now(dt.timezone.utc).strftime("%Y%m%dT%H%M%S")
+    falhas = 0
+    for nome, fn in (("comexstat", _comexstat), ("ptax", _ptax)):
+        try:
+            corpo = fn(hoje)
+        except Exception as e:  # noqa: BLE001
+            detalhe = e.read().decode(errors="replace")[:300] if isinstance(e, urllib.error.HTTPError) else str(e)
+            print(f"::warning::[{nome}] {type(e).__name__}: {detalhe}")
+            falhas += 1
+            continue
+        dbx("PUT", f"/api/2.0/fs/files{LANDING_MERCADO}/{nome}_{carimbo}.json?overwrite=true", bruto=corpo)
+        print(f"[{nome}] enviado para {LANDING_MERCADO}/{nome}_{carimbo}.json")
+    if falhas == 2:
+        sys.exit("ComexStat e PTAX falharam")
+
+
 def pipeline():
     run = dbx("POST", "/api/2.2/jobs/run-now", {"job_id": int(env("DATABRICKS_JOB_ID"))})
     rid = run["run_id"]
@@ -203,4 +263,4 @@ def saida():
 
 
 if __name__ == "__main__":
-    {"entrada": entrada, "pipeline": pipeline, "saida": saida}[sys.argv[1]]()
+    {"entrada": entrada, "mercado": mercado, "pipeline": pipeline, "saida": saida}[sys.argv[1]]()

@@ -4,9 +4,9 @@ Gerado por `scripts/gerar_dicionario.py` a partir do `information_schema` do Dat
 
 ## Índice
 
-- **bronze** — [cad_culturas](#bronzecad_culturas), [cad_fazendas](#bronzecad_fazendas), [cad_logistica](#bronzecad_logistica), [cad_mercado](#bronzecad_mercado), [cad_produtores](#bronzecad_produtores), [cad_sensores](#bronzecad_sensores), [cad_talhoes](#bronzecad_talhoes), [clima_openmeteo_horario](#bronzeclima_openmeteo_horario), [clima_previsao_diaria](#bronzeclima_previsao_diaria), [leituras_iot](#bronzeleituras_iot), [leituras_iot_externo](#bronzeleituras_iot_externo), [safras_historico](#bronzesafras_historico), [vigor_satelite](#bronzevigor_satelite)
-- **silver** — [clima_horario](#silverclima_horario), [culturas](#silverculturas), [fazendas](#silverfazendas), [leituras](#silverleituras), [leituras_horarias](#silverleituras_horarias), [leituras_quarentena](#silverleituras_quarentena), [previsao_diaria](#silverprevisao_diaria), [qualidade_leituras](#silverqualidade_leituras), [safras](#silversafras), [sensores](#silversensores), [talhoes](#silvertalhoes), [vigor](#silvervigor)
-- **gold** — [clima_diario_talhao](#goldclima_diario_talhao), [features_safra](#goldfeatures_safra), [indicadores_talhao](#goldindicadores_talhao), [modelo_fatores](#goldmodelo_fatores), [modelo_metadados](#goldmodelo_metadados), [predicoes_talhao](#goldpredicoes_talhao), [predicoes_vigor_curva](#goldpredicoes_vigor_curva), [risco_climatico_fazenda](#goldrisco_climatico_fazenda), [risco_climatico_talhao](#goldrisco_climatico_talhao), [vigor_diario](#goldvigor_diario)
+- **bronze** — [cad_culturas](#bronzecad_culturas), [cad_fazendas](#bronzecad_fazendas), [cad_logistica](#bronzecad_logistica), [cad_mercado](#bronzecad_mercado), [cad_produtores](#bronzecad_produtores), [cad_sensores](#bronzecad_sensores), [cad_talhoes](#bronzecad_talhoes), [clima_openmeteo_horario](#bronzeclima_openmeteo_horario), [clima_previsao_diaria](#bronzeclima_previsao_diaria), [leituras_iot](#bronzeleituras_iot), [leituras_iot_externo](#bronzeleituras_iot_externo), [mercado_precos_diarios](#bronzemercado_precos_diarios), [safras_historico](#bronzesafras_historico), [vigor_satelite](#bronzevigor_satelite)
+- **silver** — [clima_horario](#silverclima_horario), [culturas](#silverculturas), [fazendas](#silverfazendas), [leituras](#silverleituras), [leituras_horarias](#silverleituras_horarias), [leituras_quarentena](#silverleituras_quarentena), [mercado_fretes](#silvermercado_fretes), [mercado_precos](#silvermercado_precos), [previsao_diaria](#silverprevisao_diaria), [qualidade_leituras](#silverqualidade_leituras), [safras](#silversafras), [sensores](#silversensores), [talhoes](#silvertalhoes), [vigor](#silvervigor)
+- **gold** — [clima_diario_talhao](#goldclima_diario_talhao), [features_safra](#goldfeatures_safra), [indicadores_talhao](#goldindicadores_talhao), [mercado_modelo_metadados](#goldmercado_modelo_metadados), [mercado_previsao](#goldmercado_previsao), [mercado_referencias](#goldmercado_referencias), [mercado_serie](#goldmercado_serie), [modelo_fatores](#goldmodelo_fatores), [modelo_metadados](#goldmodelo_metadados), [predicoes_talhao](#goldpredicoes_talhao), [predicoes_vigor_curva](#goldpredicoes_vigor_curva), [risco_climatico_fazenda](#goldrisco_climatico_fazenda), [risco_climatico_talhao](#goldrisco_climatico_talhao), [vigor_diario](#goldvigor_diario)
 - **analytics** (Postgres) — [tabelas publicadas](#postgres-analytics)
 
 ## Bronze
@@ -200,6 +200,22 @@ Mensagens IoT brutas (payload JSON do ESP32). Backfill simulado 2019→agora com
 | `_source` | string | Origem do dado: open_meteo, cadastro_frontend, simulador_iot, registro_produtor_simulado, sentinel2_simulado, extrator_externo |
 | `_arquivo` | string | Arquivo de origem no Volume landing |
 
+### bronze.mercado_precos_diarios
+
+Preço diário por cultura e praça (R$/kg), simulado; praças de exportação ancoradas na ComexStat quando disponível.
+
+| Coluna | Tipo | Descrição |
+| --- | --- | --- |
+| `cultura` | string | Cultura: Manga, Uva, Goiaba ou Melão |
+| `praca` | string | Praça de venda: Petrolina (PE), CEAGESP (SP), Roterdã (Países Baixos), Filadélfia (EUA), Londres (Reino Unido) |
+| `data` | date | Data (dia local de Brasília nas tabelas diárias) |
+| `preco_brl_kg` | double | Preço do dia (R$/kg) |
+| `usd_brl` | double | Dólar PTAX de venda (R$) |
+| `origem_preco` | string | simulado ou simulado_ancorado_comexstat (forma mensal do preço real de exportação) |
+| `origem_cambio` | string | real (PTAX do Banco Central) ou aproximado (média anual) |
+| `_ingest_ts` | timestamp | Momento em que a linha entrou na Bronze (UTC) |
+| `_source` | string | Origem do dado: open_meteo, cadastro_frontend, simulador_iot, registro_produtor_simulado, sentinel2_simulado, extrator_externo |
+
 ### bronze.safras_historico
 
 Histórico de safras por talhão (simulado, modelo GDD + estresse).
@@ -335,6 +351,31 @@ Mensagens rejeitadas com motivo.
 | `gateway` | string | Gateway ou origem da mensagem (GW-F1, backend-render, thingspeak) |
 | `motivo_quarentena` | string | Por que a mensagem foi rejeitada (sensor_nao_cadastrado, data_ilegivel…) |
 
+### silver.mercado_fretes
+
+Frete estimado por kg até cada praça (parâmetro ilustrativo).
+
+| Coluna | Tipo | Descrição |
+| --- | --- | --- |
+| `praca` | string | Praça de venda: Petrolina (PE), CEAGESP (SP), Roterdã (Países Baixos), Filadélfia (EUA), Londres (Reino Unido) |
+| `frete_brl_kg` | double | Frete estimado até a praça (R$/kg, parâmetro ilustrativo) |
+| `rota` | string | Rota de transporte considerada |
+| `origem` | string | Origem: archive (reanálise) ou forecast no clima; local de partida na logística |
+
+### silver.mercado_precos
+
+Preço diário por cultura e praça (R$/kg), validado (> 0, 1 por dia).
+
+| Coluna | Tipo | Descrição |
+| --- | --- | --- |
+| `cultura` | string | Cultura: Manga, Uva, Goiaba ou Melão |
+| `praca` | string | Praça de venda: Petrolina (PE), CEAGESP (SP), Roterdã (Países Baixos), Filadélfia (EUA), Londres (Reino Unido) |
+| `data` | date | Data (dia local de Brasília nas tabelas diárias) |
+| `preco_brl_kg` | double | Preço do dia (R$/kg) |
+| `usd_brl` | double | Dólar PTAX de venda (R$) |
+| `origem_preco` | string | simulado ou simulado_ancorado_comexstat (forma mensal do preço real de exportação) |
+| `origem_cambio` | string | real (PTAX do Banco Central) ou aproximado (média anual) |
+
 ### silver.previsao_diaria
 
 | Coluna | Tipo | Descrição |
@@ -466,7 +507,7 @@ Features por talhão × safra × ponto de referência para as regressões (trein
 | `cultura` | string | Cultura: Manga, Uva, Goiaba ou Melão |
 | `variedade` | string | Variedade da cultura (Palmer, Vitória, Paluma…) |
 | `status` | string | Situação do registro (ativo, em_andamento, concluida…) |
-| `data_referencia` | date | Data em que as features foram observadas (ponto da previsão) |
+| `data_referencia` | date | Data de referência |
 | `data_plantio` | date | Data de plantio/poda da safra |
 | `dias_desde_plantio` | double | Dias desde o plantio/poda até a data de referência |
 | `fracao_ciclo` | double | Dias desde o plantio ÷ ciclo nominal da cultura |
@@ -516,6 +557,79 @@ Indicadores de produção e colheita por talhão (snapshot atual).
 | `dias_ate_colheita_cadastro` | int | Dias até a colheita prevista no cadastro |
 | `atualizado_em` | timestamp | Quando o indicador foi calculado (UTC) |
 
+### gold.mercado_modelo_metadados
+
+Métricas da validação temporal (180 dias) do modelo de preço e comparação com regras simples.
+
+| Coluna | Tipo | Descrição |
+| --- | --- | --- |
+| `modelo` | string | Alvo do modelo |
+| `horizonte_dias` | bigint | Horizonte da previsão (dias) |
+| `mape` | double | Erro percentual médio no teste temporal (%) |
+| `mape_ingenuo` | double | Erro percentual médio da regra 'o preço fica igual' (%) |
+| `mape_sazonal` | double | Erro percentual médio da regra 'repete a variação de um ano antes' (%) |
+| `mae_brl` | double | Erro absoluto médio (R$/kg) |
+| `mae_brl_ingenuo` | double | Erro absoluto médio da regra 'o preço fica igual' (R$/kg) |
+| `acerto_direcao` | double | Fração dos casos em que o modelo acertou se o preço sobe ou desce |
+| `cobertura_90` | double | Fração dos casos de teste dentro do intervalo de 90% |
+| `n_treino` | bigint | Linhas de treino |
+| `n_teste` | bigint | Linhas de teste |
+| `mlflow_run_id` | string | Execução do MLflow |
+| `treinado_em` | string | Quando o modelo foi treinado (UTC) |
+
+### gold.mercado_previsao
+
+Previsão de preço por cultura e praça em 7, 14 e 30 dias, com intervalo de 90%.
+
+| Coluna | Tipo | Descrição |
+| --- | --- | --- |
+| `cultura` | string | Cultura: Manga, Uva, Goiaba ou Melão |
+| `praca` | string | Praça de venda: Petrolina (PE), CEAGESP (SP), Roterdã (Países Baixos), Filadélfia (EUA), Londres (Reino Unido) |
+| `horizonte_dias` | bigint | Horizonte da previsão (dias) |
+| `data_base` | date | Último dia com preço usado na previsão |
+| `data_alvo` | date | Dia previsto |
+| `preco_atual` | double | Último preço da série (R$/kg) |
+| `preco_previsto` | double | Preço previsto (R$/kg), mediana |
+| `preco_p05` | double | Limite inferior do intervalo de 90% (R$/kg) |
+| `preco_p95` | double | Limite superior do intervalo de 90% (R$/kg) |
+| `variacao_prevista_pct` | double | Variação prevista sobre o preço atual (%) |
+| `modelo_run_id` | string | Execução do MLflow que gerou a previsão |
+| `gerado_em` | string | Quando foi gerado (UTC) |
+
+### gold.mercado_referencias
+
+Referências por praça: preço, variação, mínima/máxima 90 dias, frete, líquido e melhor destino.
+
+| Coluna | Tipo | Descrição |
+| --- | --- | --- |
+| `cultura` | string | Cultura: Manga, Uva, Goiaba ou Melão |
+| `praca` | string | Praça de venda: Petrolina (PE), CEAGESP (SP), Roterdã (Países Baixos), Filadélfia (EUA), Londres (Reino Unido) |
+| `data` | date | Data (dia local de Brasília nas tabelas diárias) |
+| `preco_atual` | double | Último preço da série (R$/kg) |
+| `variacao_30d_pct` | double | Variação do preço em 30 dias (%) |
+| `variacao_90d_pct` | double | Variação do preço em 90 dias (%) |
+| `minima_90d` | double | Menor preço nos últimos 90 dias (R$/kg) |
+| `maxima_90d` | double | Maior preço nos últimos 90 dias (R$/kg) |
+| `frete_brl_kg` | double | Frete estimado até a praça (R$/kg, parâmetro ilustrativo) |
+| `liquido_brl_kg` | double | Preço menos frete (R$/kg) |
+| `preco_previsto_30d` | double | Preço previsto em 30 dias (R$/kg) |
+| `liquido_previsto_30d` | double | Preço previsto em 30 dias menos frete (R$/kg) |
+| `melhor_liquido` | boolean | Praça com o maior líquido hoje para a cultura |
+| `melhor_liquido_previsto_30d` | boolean | Praça com o maior líquido previsto em 30 dias |
+| `origem_preco` | string | simulado ou simulado_ancorado_comexstat (forma mensal do preço real de exportação) |
+
+### gold.mercado_serie
+
+Preço diário por cultura e praça, últimos 365 dias (gráfico da tela Mercado).
+
+| Coluna | Tipo | Descrição |
+| --- | --- | --- |
+| `cultura` | string | Cultura: Manga, Uva, Goiaba ou Melão |
+| `praca` | string | Praça de venda: Petrolina (PE), CEAGESP (SP), Roterdã (Países Baixos), Filadélfia (EUA), Londres (Reino Unido) |
+| `data` | date | Data (dia local de Brasília nas tabelas diárias) |
+| `preco_brl_kg` | double | Preço do dia (R$/kg) |
+| `origem_preco` | string | simulado ou simulado_ancorado_comexstat (forma mensal do preço real de exportação) |
+
 ### gold.modelo_fatores
 
 Importância (permutação agrupada) do modelo de produtividade.
@@ -554,7 +668,7 @@ Predição por talhão: produtividade, janela de colheita e de exportação (tel
 | `safra_id` | string | Safra: talhão + sequência, ex. T-01-07 |
 | `cultura` | string | Cultura: Manga, Uva, Goiaba ou Melão |
 | `variedade` | string | Variedade da cultura (Palmer, Vitória, Paluma…) |
-| `data_referencia` | date | Data em que as features foram observadas (ponto da previsão) |
+| `data_referencia` | date | Data de referência |
 | `produtividade_prevista` | double | Produtividade prevista (t/ha), mediana |
 | `produtividade_p05` | double | Limite inferior do intervalo de 90% (t/ha) |
 | `produtividade_p95` | double | Limite superior do intervalo de 90% (t/ha) |
@@ -645,3 +759,7 @@ Cópias das tabelas Gold gravadas no Postgres (Aiven) pelo extrator, com as mesm
 | `analytics.risco_climatico_talhao` | `campo_vivo.gold.risco_climatico_talhao` |
 | `analytics.risco_climatico_fazenda` | `campo_vivo.gold.risco_climatico_fazenda` |
 | `analytics.indicadores_talhao` | `campo_vivo.gold.indicadores_talhao` |
+| `analytics.mercado_serie` | `campo_vivo.gold.mercado_serie` |
+| `analytics.mercado_referencias` | `campo_vivo.gold.mercado_referencias` |
+| `analytics.mercado_previsao` | `campo_vivo.gold.mercado_previsao` |
+| `analytics.mercado_modelo_metadados` | `campo_vivo.gold.mercado_modelo_metadados` |

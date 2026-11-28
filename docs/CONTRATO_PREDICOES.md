@@ -76,3 +76,53 @@ Texto sugerido: *"Modelo treinado com {n_safras} safras e leituras de {n_sensore
 3. **Leitura pública.** `GET /readings` está sem JWT hoje; o extrator funciona com ou sem chave, então pode proteger.
 4. **Dados simulados.** Histórico de leituras, safras e vigor é simulado (ver README). A tela não deve mostrar valores fixos:
    tudo acima vem das tabelas.
+
+---
+
+# Contrato `/mercado` — tela Mercado
+
+Atualizado em 27/11/2026. O modelo de preço roda no Databricks (tarefa `m03_mercado` do job diário). As tabelas
+abaixo chegam ao Postgres no schema `analytics`, pelo mesmo caminho das predições.
+**Não é preciso FastAPI**: a tela consulta referências e previsões que mudam uma vez por dia. Os novos endpoints
+convivem com o módulo `mercado` que já existe (CRUD ComexStat/PTAX) e só leem `analytics.*`.
+
+| Tabela | Grão | Colunas principais |
+|---|---|---|
+| `mercado_serie` | cultura × praça × dia (365 dias) | cultura, praca, data, preco_brl_kg, origem_preco |
+| `mercado_referencias` | cultura × praça (hoje) | preco_atual, variacao_30d_pct, variacao_90d_pct, minima_90d, maxima_90d, frete_brl_kg, liquido_brl_kg, preco_previsto_30d, liquido_previsto_30d, melhor_liquido, melhor_liquido_previsto_30d, origem_preco |
+| `mercado_previsao` | cultura × praça × horizonte (7, 14, 30 dias) | data_alvo, preco_atual, preco_previsto, preco_p05, preco_p95, variacao_prevista_pct |
+| `mercado_modelo_metadados` | horizonte | mape, mape_ingenuo, mape_sazonal, mae_brl, acerto_direcao, cobertura_90, treinado_em |
+
+Praças (valores exatos de `praca`): `Petrolina (PE)`, `CEAGESP (SP)`, `Roterdã (Países Baixos)`, `Filadélfia (EUA)`,
+`Londres (Reino Unido)`. Culturas: `Manga`, `Uva`, `Goiaba`, `Melão`.
+
+### `GET /mercado/serie?cultura=Manga&destino=Roterdã (Países Baixos)&periodo=90d` — já chamado pelo frontend
+O mapper atual lê só `preco` de cada linha, em ordem de data.
+```sql
+SELECT data, preco_brl_kg AS preco FROM analytics.mercado_serie
+WHERE cultura = $1 AND praca = $2 AND data > current_date - $3::int   -- 30d → 30, 90d → 90, 12m → 365
+ORDER BY data
+```
+Para `12m`, sugestão: média semanal (`date_trunc('week', data)`) para não mandar 365 pontos.
+Variação, mínima e máxima do card = calculadas pela API sobre a série retornada (primeiro × último ponto, min, max).
+
+### `GET /mercado/referencias?cultura=Manga` — tabela "Referências por praça"
+```sql
+SELECT praca, preco_atual, variacao_30d_pct, frete_brl_kg, liquido_brl_kg, melhor_liquido,
+       preco_previsto_30d, liquido_previsto_30d, melhor_liquido_previsto_30d, origem_preco
+FROM analytics.mercado_referencias WHERE cultura = $1 ORDER BY praca
+```
+"Melhor líquido" = linha com `melhor_liquido = true`. A coluna "Variação" da tela = `variacao_30d_pct`.
+
+### `GET /mercado/previsao?cultura=Manga&destino=Roterdã (Países Baixos)` — novo (previsão no gráfico ou num card)
+```sql
+SELECT horizonte_dias, data_alvo, preco_atual, preco_previsto, preco_p05, preco_p95, variacao_prevista_pct
+FROM analytics.mercado_previsao WHERE cultura = $1 AND praca = $2 ORDER BY horizonte_dias
+```
+Sugestão de tela: prolongar a linha do gráfico com `preco_previsto` e uma faixa `preco_p05`–`preco_p95`,
+como na curva de vigor das Predições de IA.
+
+### Dados reais × simulados
+`origem_preco` diz de onde vem cada série: `simulado` ou `simulado_ancorado_comexstat` (forma mensal do preço real
+de exportação FOB/kg da ComexStat e câmbio PTAX real, baixados pelo GitHub Actions). Não há fonte pública diária de
+preço por praça; o frete é parâmetro ilustrativo. Manter o aviso "valores ilustrativos" na tela.

@@ -178,6 +178,51 @@
    ],
    "max_retries": 1,
    "min_retry_interval_millis": 60000
+  },
+  {
+   "task_key": "b06_mercado",
+   "spark_python_task": {
+    "python_file": "dbfs:/Volumes/campo_vivo/bronze/code/bronze/b06_mercado.py"
+   },
+   "environment_key": "default",
+   "depends_on": [
+    {
+     "task_key": "s01_referencias"
+    }
+   ],
+   "max_retries": 1,
+   "min_retry_interval_millis": 60000
+  },
+  {
+   "task_key": "s03_mercado",
+   "spark_python_task": {
+    "python_file": "dbfs:/Volumes/campo_vivo/bronze/code/silver/s03_mercado.py"
+   },
+   "environment_key": "default",
+   "depends_on": [
+    {
+     "task_key": "b06_mercado"
+    }
+   ],
+   "max_retries": 1,
+   "min_retry_interval_millis": 60000
+  },
+  {
+   "task_key": "m03_mercado",
+   "spark_python_task": {
+    "python_file": "dbfs:/Volumes/campo_vivo/bronze/code/ml/m03_mercado.py"
+   },
+   "environment_key": "default",
+   "depends_on": [
+    {
+     "task_key": "m01_treino_predicao"
+    },
+    {
+     "task_key": "s03_mercado"
+    }
+   ],
+   "max_retries": 1,
+   "min_retry_interval_millis": 60000
   }
  ]
 }

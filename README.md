@@ -40,12 +40,12 @@ Leituras reais do backend e do ThingSpeak entram por `bronze.leituras_iot_extern
 ## Estrutura
 ```
 src/common.py               utilidades (catálogo, metadados, ruído determinístico, microclima)
-src/bronze/b01…b05          cadastros · clima Open-Meteo · simulador IoT · safras e vigor · IoT externo (Auto Loader)
-src/silver/s01, s02         referências tipadas · tratamento das leituras IoT (item 3)
+src/bronze/b01…b06          cadastros · clima Open-Meteo · simulador IoT · safras e vigor · IoT externo (Auto Loader) · mercado
+src/silver/s01…s03          referências tipadas · tratamento das leituras IoT (item 3) · mercado e fretes
 src/gold/g01, g02           clima diário, vigor diário, indicadores (item 5) · features para ML
-src/ml/m01, m02             regressões + predições (itens 6 e 7) · risco climático 7 dias
+src/ml/m01…m03              regressões + predições (itens 6 e 7) · risco climático 7 dias · previsão de preço de mercado
 src/eda/eda_climatica.py    notebook de análise exploratória (item 4)
-extrator/extrator.py        entrada (landing) · pipeline (run-now) · saida (Postgres)
+extrator/extrator.py        entrada (landing) · mercado (ComexStat + PTAX) · pipeline (run-now) · saida (Postgres)
 jobs/…json                  definição do job no Databricks
 docs/CONTRATO_PREDICOES.md  contrato das tabelas analytics e dos endpoints /predicoes
 docs/DICIONARIO_DE_DADOS.md todas as tabelas e colunas (gerado por scripts/gerar_dicionario.py)
@@ -65,6 +65,12 @@ Alvos (y): produtividade · início e duração da colheita · início e duraç�
 Validação temporal (teste = safras plantadas a partir de 01/06/2025). Se o ML não supera a média da cultura no teste,
 o pipeline usa a média e registra isso em `gold.modelo_metadados.estrategia`. Tudo registrado no MLflow
 (`/Shared/campo_vivo_predicoes`).
+
+### Mercado
+Previsão do preço por cultura × praça em 7, 14 e 30 dias (`m03_mercado`), com o mesmo método: retorno logarítmico como alvo,
+quantis p05/p50/p95 com calibração conformal e validação temporal (últimos 180 dias) contra a regra ingênua (preço igual)
+e a sazonal. Série diária por praça simulada; praças de exportação ancoradas no preço FOB real da ComexStat e na PTAX
+quando o extrator já os baixou. Contrato em `docs/CONTRATO_PREDICOES.md` (seção `/mercado`).
 
 ## Como rodar
 1. Workspace Databricks com o catálogo `campo_vivo` (schemas `bronze`, `silver`, `gold`, `ml`; volumes `bronze.landing`, `bronze.code`, `gold.relatorios`).

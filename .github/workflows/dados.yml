@@ -5,7 +5,8 @@ name: Pipeline de dados (Databricks)
 #   agendado (a cada 3 h): leituras reais → landing  +  previsões mais recentes → Postgres (analytics)
 #     → se o GitHub pular uma execução agendada, a próxima recupera.
 #   push no main (src/ ou seeds/): publica o código no Volume do Databricks.
-#   manual: entrada | saida | pipeline (roda o job agora e publica).
+#   agendado das 06:17 UTC (03:17 BRT): também baixa ComexStat + PTAX (mercado) antes do job das 05:37.
+#   manual: entrada | mercado | saida | pipeline (roda o job agora e publica).
 on:
   schedule:
     - cron: "17 */3 * * *"
@@ -15,7 +16,7 @@ on:
   workflow_dispatch:
     inputs:
       etapa:
-        description: "entrada | saida | pipeline"
+        description: "entrada | mercado | saida | pipeline"
         required: true
         default: saida
 
@@ -56,6 +57,13 @@ jobs:
           THINGSPEAK_READ_API_KEY: ${{ secrets.THINGSPEAK_READ_API_KEY }}
           THINGSPEAK_DEVICE: ${{ vars.THINGSPEAK_DEVICE }}
         run: python extrator/extrator.py entrada
+      - name: Mercado (ComexStat + PTAX) → landing
+        if: github.event_name == 'schedule' || inputs.etapa == 'mercado'
+        run: |
+          if [ "${{ github.event_name }}" = "schedule" ] && [ "$(date -u +%H)" != "06" ]; then
+            echo "Mercado só roda uma vez por dia (06 UTC)."; exit 0
+          fi
+          python extrator/extrator.py mercado
       - name: Publicar código e rodar o pipeline agora
         if: inputs.etapa == 'pipeline'
         run: |
