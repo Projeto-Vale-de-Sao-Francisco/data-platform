@@ -73,7 +73,7 @@ Texto sugerido: *"Modelo treinado com {n_safras} safras e leituras de {n_sensore
    `sensor_nao_cadastrado`). Precisamos de um cadastro único de sensores (sugestão: o do backend passa a usar os códigos `SN-…`).
 2. **IDs de fazenda.** `fazenda_id` nas tabelas `analytics` segue o cadastro do frontend (1 Santa Helena, 2 Boa Vista,
    3 Três Irmãos). Use `talhao_codigo` para juntar com o banco do backend.
-3. **Leitura pública.** `GET /readings` está sem JWT hoje; o extrator funciona com ou sem chave, então pode proteger.
+3. **Leitura pelo pipeline.** Combinado em 27/11: `GET /readings` protegido por JWT, e o extrator usa uma chave de serviço só de leitura no header `x-pipeline-key` (segredo `PIPELINE_API_KEY` no GitHub, independente da `DEVICE_API_KEY`), aceita apenas nesse endpoint.
 4. **Dados simulados.** Histórico de leituras, safras e vigor é simulado (ver README). A tela não deve mostrar valores fixos:
    tudo acima vem das tabelas.
 

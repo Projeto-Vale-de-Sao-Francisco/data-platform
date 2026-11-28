@@ -50,3 +50,13 @@ def test_feed_thingspeak_le_os_cinco_campos():
 
 def test_feed_thingspeak_valor_nao_numerico_vira_ausente():
     assert "temperatura" not in ex.feed_thingspeak_para_payload({"created_at": "x", "field1": "nan?"}, "SN-101")
+
+
+def test_entrada_backend_usa_chave_de_servico(monkeypatch):
+    chamadas = []
+    monkeypatch.setenv("BACKEND_URL", "https://api.exemplo")
+    monkeypatch.setenv("PIPELINE_API_KEY", " chave-teste \n")
+    monkeypatch.setattr(ex, "http", lambda metodo, url, corpo=None, headers=None, **kw: chamadas.append(headers) or [])
+    import datetime as dt
+    assert ex._backend(dt.datetime(2026, 11, 28, tzinfo=dt.timezone.utc)) == []
+    assert chamadas == [{"x-pipeline-key": "chave-teste"}]

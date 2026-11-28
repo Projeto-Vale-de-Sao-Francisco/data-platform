@@ -84,7 +84,8 @@ quando o extrator já os baixou. Contrato em `docs/CONTRATO_PREDICOES.md` (seç�
 |---|---|---|
 | `DATABRICKS_HOST`, `DATABRICKS_TOKEN` | secret | token **separado**, só escopos `files`, `sql`, `jobs` |
 | `DATABASE_URL` | secret | URL externa do Postgres do Render |
-| `DEVICE_API_KEY`, `THINGSPEAK_READ_API_KEY` | secret | opcionais |
+| `PIPELINE_API_KEY` | secret | chave de serviço só de leitura do backend (header `x-pipeline-key`, só `GET /readings`) |
+| `THINGSPEAK_READ_API_KEY` | secret | opcional |
 | `DATABRICKS_WAREHOUSE_ID`, `DATABRICKS_JOB_ID`, `BACKEND_URL`, `THINGSPEAK_CHANNEL_ID` | variable | `0e8d14e2365f32b0`, `335240795921917`, `https://chico-talhao-backend.onrender.com`, `3502672` |
 
 Agendamento: o **job do Databricks roda sozinho às 05:37 BRT** (o agendamento do GitHub Actions pode atrasar ou pular

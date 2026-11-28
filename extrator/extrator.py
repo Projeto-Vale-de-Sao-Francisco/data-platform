@@ -13,7 +13,7 @@ O Databricks Free Edition não alcança o Render nem o ThingSpeak, então a inte
 
 Uso:  python extrator.py entrada | mercado | pipeline | saida
 Variáveis: DATABRICKS_HOST, DATABRICKS_TOKEN, DATABRICKS_WAREHOUSE_ID, DATABRICKS_JOB_ID, BACKEND_URL,
-           DEVICE_API_KEY (opcional), THINGSPEAK_CHANNEL_ID, THINGSPEAK_READ_API_KEY, THINGSPEAK_DEVICE, DATABASE_URL
+           PIPELINE_API_KEY (header x-pipeline-key), THINGSPEAK_CHANNEL_ID, THINGSPEAK_READ_API_KEY, THINGSPEAK_DEVICE, DATABASE_URL
 """
 from __future__ import annotations
 
@@ -113,7 +113,8 @@ def _backend(agora):
     backend = env("BACKEND_URL")
     inicio = (agora - dt.timedelta(days=2)).isoformat()
     q = urllib.parse.urlencode({"dataInicio": inicio, "limit": 1000})
-    h = {"x-api-key": os.environ["DEVICE_API_KEY"].strip()} if os.environ.get("DEVICE_API_KEY") else {}
+    # chave de serviço só de leitura, aceita pelo backend apenas em GET /readings (independente da DEVICE_API_KEY)
+    h = {"x-pipeline-key": os.environ["PIPELINE_API_KEY"].strip()} if os.environ.get("PIPELINE_API_KEY") else {}
     return [{"payload": json.dumps(medicao_backend_para_payload(m)), "gateway": "backend-render"}
             for m in http("GET", f"{backend.rstrip('/')}/readings?{q}", headers=h, timeout=180)]
 

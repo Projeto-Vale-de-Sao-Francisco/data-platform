@@ -52,7 +52,7 @@ jobs:
         if: github.event_name == 'schedule' || inputs.etapa == 'entrada'
         env:
           BACKEND_URL: ${{ vars.BACKEND_URL }}
-          DEVICE_API_KEY: ${{ secrets.DEVICE_API_KEY }}
+          PIPELINE_API_KEY: ${{ secrets.PIPELINE_API_KEY }}
           THINGSPEAK_CHANNEL_ID: ${{ vars.THINGSPEAK_CHANNEL_ID }}
           THINGSPEAK_READ_API_KEY: ${{ secrets.THINGSPEAK_READ_API_KEY }}
           THINGSPEAK_DEVICE: ${{ vars.THINGSPEAK_DEVICE }}
